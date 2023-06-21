@@ -41,7 +41,7 @@ app.all('*',(req,res,next)=>{
 
 //error
 app.use((err,req,res,next)=>{
-    res.status(400).json({success: false, data : err.message});
+    res.json({success: false, data : err.message});
 })
 
 const PORT = process.env.PORT || 3000;

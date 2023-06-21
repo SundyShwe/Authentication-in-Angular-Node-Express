@@ -1,0 +1,71 @@
+Installation & Configuration
+******************
+    1. install Angular cli (no needs if you have aldy installed)
+            npm i @angular/cli 
+           
+    2. create new app 
+            ng new urAppName -s -t -S
+    
+    3. go to new app folder
+            cd urAppName
+    
+    4. Install necessary npm mdoules
+            npm i jwt-decode
+            npm i --save bootstrap
+
+    5. Configrure Bootstrap UI  : put css and js in angulr.js
+             "styles": [
+                  "./node_modules/bootstrap/dist/css/bootstrap.min.css",
+                  "src/styles.css"
+                ],
+                "scripts": [
+                  "./node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"
+                ]
+
+    6. create environments variables and export them
+            ng g environments
+            in src/environments folder > environments.ts 
+                export const environment = {
+                    SERVER_URL: 'http://localhost:3000/'
+                };
+
+    7. create welcome/home component (a companent = a html page)
+            ng g c welcome
+    
+    8. create a seperate module for Authentication
+            ng g m Auth
+
+    9. create components for Authentication module
+            ng g c Auth\signin --flat
+            ng g c Auth\signup --flat
+
+    10. create service for Authentication module
+            ng g s Auth\Auth
+    
+    11. create guard to protect URL
+            ng g guard Auth\Auth --functional
+
+    12. create http interceptor to add token for API calls
+            ng g interceptor Auth\AddToken --functional
+
+Root Module SetUp
+*****************
+    in app.module.ts file
+        1. import httpClient Module
+                import { provideHttpClient } from '@angular/common/http';
+                providers: [provideHttpClient()],
+        
+        2. import Router Module
+                import { RouterModule } from '@angular/router';
+                imports: [
+                            RouterModule.forRoot([
+                            {path : '',component : WelcomeComponent, title: 'Welcome to My App'}
+                            ])
+                        ],
+                in app.component.ts template, add router-outlet
+                        <router-outlet/>            
+        3. Run your app
+                ng s -o
+
+Work on components and services according to the business logic
+***************************************************************
