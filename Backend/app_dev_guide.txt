@@ -1,0 +1,199 @@
+1. Installations
+****************
+      1.  npm init -y
+      2.  npm i express
+      3.  npm i nodemon -D
+      4.  npm i cors
+      5.  npm i jsonwebtoken
+      6.  npm i bcrypt
+      7.  npm i dotenv
+      8.  npm i morgan
+      9.  npm i mongoose
+
+2. Configuration
+      1. in package.json
+            - set "main" : "index.js"
+            - include "type": "module", 
+            - in "script": {
+                        "start": "node index.js",
+                        "dev": "nodemon index.js"
+                      },
+      2. create index.js file in root folder
+      3. create .env file in root folder and write
+              DB_URL ="mongodb://127.0.0.1:27017/june"
+              JWT_PRIVATE_KEY="0your1secret2key3to4generate5json6token7"
+
+3. Folders and File
+      1. create your module folder : eg. Auth
+      2. create these 4 files
+            - auth.router.js
+            - auth.controller.js
+            - auth.model.js
+            - auth.middleware.js (if any)
+            - auth.test.http
+
+4. Prepare Router files First
+      inside auth.router.js
+            import { Router } from "express";
+            const router = Router();
+            export default router; 
+
+5. index.js
+*************
+    1. Express
+          import express, { json } from 'express'
+          const app = express();
+          app.use(json())
+          //routes
+          app.all('*',(req,res,next)=>{
+           next(new Error('Route Not Found'));
+          })
+          //error
+          app.use((err,req,res,next)=>{
+              res.status(400).json({success: false, data : err.message});
+          })
+          const PORT = process.env.PORT || 2324;
+          app.listen(PORT, ()=>console.log('Listening to :'+PORT));
+
+      2. cors
+            import cors from 'cors'
+            app.use(cors())
+
+      3. dotenv
+            import dotenv from 'dotenv'
+            dotenv.config();
+
+      4. morgan
+            import morgan from 'morgan'
+            app.use(morgan('dev'))
+
+      5. MongoDB
+            import mongoose from 'mongoose'
+            mongoose.connect(process.env.DB_URL)
+                    .then(val => console.log(`Successfully connected to DB`))
+                    .catch(error => console.log(`Error in connecting DB ${error}`));
+
+6. Routing      :     work this way : model -> controller -> router -> middleware -> index.js
+***********
+            1. Create the model first
+                  - in auth.model.js      : create schema & export model
+                        import { Schema, model } from 'mongoose';
+                        const schema = new Schema({
+                            fullname: { type: String, require: true },
+                            email: { type: String, require: true, unique: true },
+                            password: { type: String, require: true },
+                        })
+                        export default model('user', schema)
+      
+            2. Create the controller 
+                  - in auth.controller.js      : DB transaction functions
+                        import bcrypt from "bcrypt"
+                        import jwt from "jsonwebtoken"
+                        import usersModel from "../users/users.model.js"      
+                        export const DBFun = async (req, res, next) => {
+                                  try {
+                                          const user = await usersModel.findOne({ email }).lean(); //**ALWAYS AWAIT DB TRANSACTION!!
+                                           res.json({ success: true, data: user })
+                                    }
+                                    catch(err){
+                                          next(err)
+                                    }
+                        }
+
+                  -  using Jsonwebtoken and bcrypt for passwrod encryption and token passing to API Calls
+                              export const signup = async (req, res, next) => {
+                                  try {
+                                      const new_user = req.body;
+                                      const { password: plain_password } = new_user;
+                              
+                                      if (!plain_password) throw new Error(`Password not found`)
+                                      const hashed_password = await bcrypt.hash(plain_password, 10)
+                              
+                                      const results = await usersModel.create({
+                                          ...new_user,
+                                          password: hashed_password
+                                      })
+                                      res.json({ success: true, data: results })
+                                  } catch (error) {
+                                      next(error)
+                                  }
+                              }
+                              export const signin = async (req, res, next) => {
+                                  try {
+                                      const { email, password } = req.body;
+                                      const user = await usersModel.findOne({ email }).lean();
+                                      if (!user) throw new Error(`User not found`, 401);
+                              
+                                      const match = await bcrypt.compare(password, user.password);
+                                      if (!match) throw new Error(`Wrong password`, 401);
+                              
+                                      if (!process.env.JWT_PRIVATE_KEY) throw new Error('Could not sign token', 500)
+                                      const JWT = jwt.sign({ _id: user._id, fullname: user.fullname, email: user.email }, process.env.JWT_PRIVATE_KEY)
+                              
+                                      res.json({ success: true, data: JWT })
+                              
+                                  } catch (error) {
+                                      next(error)
+                                  }
+                              }
+
+            3. Create Routes in Router file
+                        import { Router } from 'express'
+                        const router = Router();
+                        
+                        import { signin, signup } from './users.controller.js';
+                        router.post('/signin', signin)
+                        router.post('/signup', signup)
+                        
+                        export default router;
+
+            4. (Optional for Middleware) Create a middleware : eg. to check Token from API Calls
+                        import jwt from "jsonwebtoken";
+                        export const checkToken = async (req, res, next) => {
+                            try {
+                                const header = req.headers['authorization'];
+                                if (!header) throw new ErrorResponse(`Token is required`, 401);
+                        
+                                const token = header.split(' ')[1]
+                                if (!token) throw new ErrorResponse(`Token is not correct`, 401);
+                        
+                                const decoded_token = jwt.verify(token, process.env.JWT_PRIVATE_KEY)
+                                if (!decoded_token) throw new ErrorResponse(`Wrong Token Signature`, 401);
+                        
+                                req.body['tokenData'] = decoded_token;
+                                next()
+                            } catch (e) {
+                                next(e)
+                            }
+                        }
+
+            5. Include the routes in index.js      : app.use(route, middleware, routerfile)
+                        import groupsRouter from './groups/groups.router.js';
+                        import authRouter from './auth/auth.router.js';
+                        import { checkToken } from './auth/auth.middleware.js'
+                        // routes
+                        app.use('/groups', checkToken, groupsRouter)  <-- here checkToken is Middleware
+                        app.use('/auth', authRouter)
+
+            6. YOU'RE DONE! 
+                  - start the app from command line
+                        npm run dev
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
